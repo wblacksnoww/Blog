@@ -6,6 +6,7 @@ import { INITIAL_POSTS, CURRENT_USER } from './constants';
 import { BlogPost, ViewState, FileSystemDirectoryHandle } from './types';
 import { PenSquare, Feather, Upload, Lock, Unlock, X, LogIn, HardDrive, RefreshCw, Settings, FolderOpen, CheckCircle, AlertTriangle } from 'lucide-react';
 import { isFileSystemSupported, openVault, scanVault, scanFileList } from './services/fileSystem';
+import { fetchPosts, savePost as apiSavePost } from './services/apiService';
 
 const App: React.FC = () => {
   const [posts, setPosts] = useState<BlogPost[]>(INITIAL_POSTS);
@@ -28,6 +29,21 @@ const App: React.FC = () => {
   // Legacy input ref for fallback
   const legacyInputRef = useRef<HTMLInputElement>(null);
 
+  // Load posts from server on mount
+  React.useEffect(() => {
+    const loadPosts = async () => {
+      try {
+        const serverPosts = await fetchPosts();
+        if (serverPosts.length > 0) {
+          setPosts(serverPosts);
+        }
+      } catch (e) {
+        console.error("Failed to load posts from server:", e);
+      }
+    };
+    loadPosts();
+  }, []);
+
   const handleNavigateToPost = (post: BlogPost) => {
     setActivePost(post);
     setCurrentView(ViewState.ARTICLE);
@@ -49,23 +65,31 @@ const App: React.FC = () => {
     setCurrentView(ViewState.EDITOR);
   };
 
-  const handleSavePost = (savedPost: BlogPost) => {
-    const existingIndex = posts.findIndex(p => p.id === savedPost.id);
-    
-    if (existingIndex >= 0) {
-      // Update existing post
-      const updatedPosts = [...posts];
-      updatedPosts[existingIndex] = savedPost;
-      setPosts(updatedPosts);
-    } else {
-      // Create new post
-      setPosts([savedPost, ...posts]);
+  const handleSavePost = async (savedPost: BlogPost) => {
+    try {
+      // Save to server
+      const serverPost = await apiSavePost(savedPost);
+      
+      const existingIndex = posts.findIndex(p => p.id === serverPost.id);
+      
+      if (existingIndex >= 0) {
+        // Update existing post
+        const updatedPosts = [...posts];
+        updatedPosts[existingIndex] = serverPost;
+        setPosts(updatedPosts);
+      } else {
+        // Create new post
+        setPosts([serverPost, ...posts]);
+      }
+      
+      // Navigate to the article
+      setActivePost(serverPost);
+      setEditingPost(null);
+      setCurrentView(ViewState.ARTICLE);
+    } catch (e: any) {
+      console.error("Failed to save post:", e);
+      alert(`Failed to save post to server: ${e.message}`);
     }
-    
-    // Navigate to the article
-    setActivePost(savedPost);
-    setEditingPost(null);
-    setCurrentView(ViewState.ARTICLE);
   };
 
   const handleConnectVault = async () => {
@@ -150,7 +174,7 @@ const App: React.FC = () => {
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginPassword === 'admin') {
+    if (loginPassword === 'zww5211314') {
       setIsAdmin(true);
       setIsLoginModalOpen(false);
       setLoginPassword('');
@@ -161,7 +185,7 @@ const App: React.FC = () => {
   };
 
   const editorUser = isAdmin 
-    ? { ...CURRENT_USER, name: "Administrator" } 
+    ? { ...CURRENT_USER, name: "blacksnow" } 
     : CURRENT_USER;
 
   return (
